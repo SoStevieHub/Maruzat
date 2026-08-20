@@ -304,7 +304,7 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log('');
-  console.log('  🧠  MENTAL ONAY');
+  console.log('  🧠  MENTAL0');
   console.log(`  Panel   : http://localhost:${PORT}/admin.html`);
   console.log(`  Overlay : http://localhost:${PORT}/overlay.html   (OBS Browser Source · 960x1080)`);
   console.log(`  Kanal   : ${KANAL} · chatroom ${CHATROOM_ID}`);

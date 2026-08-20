@@ -1,4 +1,4 @@
-# 🧠 Mental Onay
+# 🧠 Mental0
 
 Kick chat'ini okur, panelden seçtiğin mesajı şeffaf bir overlay'e basar ve istersen
 AI'ın o mesaj hakkında yazdığı mizahi "mental sağlık raporu"nu yazılı + sesli olarak
