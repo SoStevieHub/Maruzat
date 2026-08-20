@@ -13,6 +13,8 @@ const { USLUPLAR, uslupListesi, kullaniciMesaji, raporAyristir, seslendirmeMetni
 const { seslendir, getir: sesGetir, SESLER, VARSAYILAN_SES } = require('./lib/tts');
 const { profilFotosu, yapilandirildiMi: avatarHazirMi } = require('./lib/avatar');
 const { riskliMi } = require('./lib/safety');
+const { linkleriBul, linkleriBulDetayli } = require('./lib/links');
+const chatKaydi = require('./lib/log');
 
 // ─── AYARLAR ──────────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT || 3200);
@@ -21,13 +23,16 @@ const KANAL = process.env.KICK_CHANNEL_SLUG || 'sostevie';
 const PUSHER_KEY = '32cbd69e4b950bf97679';   // Kick'in public Pusher app key'i
 const PUSHER_CLUSTER = 'us2';
 const MESAJ_TAMPONU = 200;                   // panelde tutulan son mesaj sayısı
+const LINK_TAMPONU = 300;                    // Linkler sekmesinde tutulan son link sayısı
 const ENGELLI = new Set(
   (process.env.BLOCKED_USERS || 'botrix').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
 );
 
 // ─── DURUM ────────────────────────────────────────────────────────────────────
 let mesajlar = [];
+let linkler = [];      // { id, messageId, userId, user, color, url, at }
 let sonrakiId = 1;
+let sonrakiLinkId = 1;
 let raporNonce = 0;
 
 let overlayDurumu = {
@@ -39,6 +44,7 @@ const ayarlar = {
   uslup: 'doktor',
   ses: VARSAYILAN_SES,
   konusmaHizi: '0%',
+  zemin: false,        // overlay'de yazının arkasına yukarı doğru açılan gradient
 };
 
 let pusherDurumu = { connected: false };
@@ -99,11 +105,19 @@ function chatMesaji(data) {
     message: content,
     at: new Date().toISOString(),
     risk: riskliMi(content),
+    // Panel metni tıklanabilir yaparken bunu kullanıyor; ayrıştırma tek yerde kalsın.
+    links: linkleriBulDetayli(content),
   };
 
   mesajlar.push(kayit);
   if (mesajlar.length > MESAJ_TAMPONU) mesajlar = mesajlar.slice(-MESAJ_TAMPONU);
+
+  const yeniLinkler = linkleriEkle(kayit);
+  logla(kayit);
+
   yayinla('chat:message', kayit);
+  if (yeniLinkler.length) yayinla('link:yeni', yeniLinkler);
+  yayinla('log:bilgi', chatKaydi.bilgi());
 
   // Fotoğraf arkadan gelir; geldiğinde panele ve (yayındaysa) overlay'e iletilir.
   profilFotosu(kayit.userId).then((url) => {
@@ -121,6 +135,54 @@ function mesajBul(id) {
   return mesajlar.find((m) => m.id === Number(id)) || null;
 }
 
+// Mesajdaki bağlantıları Linkler sekmesinin listesine ekler, eklenenleri döndürür.
+// BotRix gibi engelli hesaplar chatMesaji'nin başında elendiği için buraya hiç gelmiyor.
+function linkleriEkle(m) {
+  const yeni = linkleriBul(m.message).map((url) => ({
+    id: sonrakiLinkId++,
+    messageId: m.id,
+    userId: m.userId,
+    user: m.user,
+    color: m.color,
+    avatar: m.avatar,
+    url,
+    at: m.at,
+  }));
+  if (!yeni.length) return [];
+  linkler.push(...yeni);
+  if (linkler.length > LINK_TAMPONU) linkler = linkler.slice(-LINK_TAMPONU);
+  return yeni;
+}
+
+function logla(m) {
+  chatKaydi.yaz({
+    id: m.id, userId: m.userId, user: m.user, slug: m.slug,
+    color: m.color, message: m.message, at: m.at, risk: m.risk,
+  });
+}
+
+// Açılışta log dosyasından son mesajları ve linkleri geri yükler.
+function logdanYukle() {
+  let kayitlar;
+  try {
+    kayitlar = chatKaydi.oku();
+  } catch (err) {
+    console.error('[log] okunamadı:', err.message);
+    return;
+  }
+  if (!kayitlar.length) return;
+
+  sonrakiId = Math.max(...kayitlar.map((k) => Number(k.id) || 0)) + 1;
+
+  // Linkler tüm geçmişten, mesaj listesi yalnızca son tampon kadar.
+  for (const k of kayitlar) linkleriEkle({ ...k, avatar: null });
+  mesajlar = kayitlar.slice(-MESAJ_TAMPONU).map((k) => ({
+    ...k, avatar: null, links: linkleriBulDetayli(k.message),
+  }));
+
+  console.log(`📂 Log'dan yüklendi: ${kayitlar.length} mesaj, ${linkler.length} link`);
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 app.get('/api/config', (req, res) => {
   res.json({
@@ -135,14 +197,45 @@ app.get('/api/config', (req, res) => {
 });
 
 app.get('/api/state', (req, res) => {
-  res.json({ mesajlar: mesajlar.slice(-100), overlay: overlayDurumu, pusher: pusherDurumu, ayarlar });
+  res.json({
+    mesajlar: mesajlar.slice(-100),
+    linkler,
+    log: chatKaydi.bilgi(),
+    overlay: overlayDurumu,
+    pusher: pusherDurumu,
+    ayarlar,
+  });
+});
+
+// Kaydı sıfırla: log dosyası, mesaj tamponu ve link listesi birlikte temizlenir.
+app.post('/api/log/temizle', (req, res) => {
+  try {
+    chatKaydi.temizle();
+  } catch (err) {
+    return res.status(500).json({ error: 'Log temizlenemedi: ' + err.message });
+  }
+  mesajlar = [];
+  linkler = [];
+  yayinla('chat:bulk', []);
+  yayinla('link:bulk', []);
+  yayinla('log:bilgi', chatKaydi.bilgi());
+  console.log('🧹 Chat kaydı temizlendi');
+  res.json({ ok: true, log: chatKaydi.bilgi() });
+});
+
+// Ham kaydı indir (yedek almak ya da başka yerde incelemek için).
+app.get('/api/log/indir', (req, res) => {
+  const bilgi = chatKaydi.bilgi();
+  if (!bilgi.satir) return res.status(404).json({ error: 'Kayıt boş.' });
+  res.download(chatKaydi.DOSYA, 'chat-log.jsonl');
 });
 
 app.post('/api/ayarlar', (req, res) => {
-  const { uslup, ses, konusmaHizi } = req.body || {};
+  const { uslup, ses, konusmaHizi, zemin } = req.body || {};
   if (uslup && USLUPLAR[uslup]) ayarlar.uslup = uslup;
   if (ses && SESLER.some((s) => s.id === ses)) ayarlar.ses = ses;
   if (typeof konusmaHizi === 'string') ayarlar.konusmaHizi = konusmaHizi;
+  if (typeof zemin === 'boolean') ayarlar.zemin = zemin;
   yayinla('ayarlar', ayarlar);
   res.json({ ok: true, ayarlar });
 });
@@ -297,10 +390,14 @@ app.get('/', (req, res) => res.redirect('/admin.html'));
 // ─── SOCKET ───────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   socket.emit('chat:bulk', mesajlar.slice(-100));
+  socket.emit('link:bulk', linkler);
+  socket.emit('log:bilgi', chatKaydi.bilgi());
   socket.emit('overlay:state', overlayDurumu);
   socket.emit('pusher:status', pusherDurumu);
   socket.emit('ayarlar', ayarlar);
 });
+
+logdanYukle();
 
 // Port doluysa yığın izi yerine anlaşılır bir mesaj bas (genelde zaten açık demektir).
 server.on('error', (err) => {

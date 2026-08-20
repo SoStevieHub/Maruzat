@@ -52,6 +52,28 @@
     gap: 34px;
   }
 
+  /* Panelden açılabilen zemin. Yalnızca içeriğin kapladığı alanı örter (#sahne
+     alta yaslı ve boyu içerik kadar), yukarı doğru şeffaflaşır. Sağ kenarda da
+     maske ile söner ki ekranın ortasında keskin bir çizgi oluşmasın.
+     Yazıyı etkilemesin diye ::before kullanılıyor, içerik z-index ile üstte. */
+  #sahne.zeminli { padding-top: 200px; }
+  #sahne.zeminli::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: linear-gradient(
+      to top,
+      rgba(0,0,0,.90) 0%,
+      rgba(0,0,0,.80) 32%,
+      rgba(0,0,0,.52) 62%,
+      rgba(0,0,0,.20) 84%,
+      rgba(0,0,0,0) 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 60%, transparent 100%);
+            mask-image: linear-gradient(to right, #000 60%, transparent 100%);
+  }
+  #mesaj, #rapor { position: relative; z-index: 1; }
+
   /* ─── Öne çıkarılan mesaj ─────────────────────────────────────────────── */
   #mesaj {
     display: flex;
@@ -400,6 +422,10 @@
   ses.addEventListener('error', () => {
     $('eq').classList.remove('acik');
     if (pendingRapor) { daktilo($('raporMetin'), pendingRapor, 2200); pendingRapor = null; }
+  });
+
+  socket.on('ayarlar', (a) => {
+    $('sahne').classList.toggle('zeminli', Boolean(a && a.zemin));
   });
 
   socket.on('overlay:state', (s) => {

@@ -60,8 +60,28 @@ Browser Source ekle:
 5. **Yayına ver (yazılı)** ya da **Yayına ver (sesli)**.
 6. **Raporu kaldır** raporu indirir, **Overlay'i tamamen temizle** her şeyi siler.
 
-Üst bardan üslup (Sahte Psikiyatrist / İğneleyici / Şefkatli Absürt), ses (Emel / Ahmet)
-ve konuşma hızı değiştirilir.
+Üst bardan üslup (Sahte Psikiyatrist / İğneleyici / Şefkatli Absürt), ses (Emel / Ahmet),
+konuşma hızı, **overlay zemini** ve **açık/koyu tema** değiştirilir.
+
+### Sekmeler
+
+- **Sohbet** — akan chat. Mesajlardaki bağlantılar tıklanabilir (yeni sekmede açılır).
+- **Linkler** — sadece chat'te paylaşılan bağlantılar, en yenisi üstte. Her satırdan
+  kaynak mesajı doğrudan öne çıkarabilir ya da AI'a verebilirsin.
+
+### Chat kaydı
+
+Her mesaj `data/chat-log.jsonl` dosyasına satır satır yazılır. Sunucu yeniden
+başladığında panel bu dosyadan geri yüklenir, sohbet ve linkler kaybolmaz.
+Alttaki çubuktan kaydı indirebilir ya da **🧹 Kaydı temizle** ile sıfırlayabilirsin
+(dosya + sohbet listesi + linkler birlikte silinir, geri alınamaz).
+
+### Overlay zemini
+
+"overlay zemini" işaretlenirse overlay'de yazının arkasına, aşağıda koyu olup yukarı
+doğru şeffaflaşan bir gradient gelir. Yalnızca içeriğin kapladığı alanı örter; sağ
+kenarda da maskeyle söner, böylece ekranın ortasında keskin bir kesim oluşmaz.
+Kapalıyken overlay tamamen şeffaftır.
 
 ## Mimari
 
