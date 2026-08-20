@@ -33,6 +33,10 @@ npm install
 npm start
 ```
 
+Ya da `Baslat.bat` dosyasına çift tıkla — bağımlılıklar eksikse kurar, sunucuyu
+başlatır ve hazır olunca paneli tarayıcıda açar. Masaüstündeki **Mental0** kısayolu
+da bunu çalıştırır. Kapatmak için siyah pencerede Ctrl+C.
+
 - **Panel:** http://localhost:3200/admin.html
 - **Overlay:** http://localhost:3200/overlay.html
 

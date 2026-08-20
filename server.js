@@ -302,6 +302,19 @@ io.on('connection', (socket) => {
   socket.emit('ayarlar', ayarlar);
 });
 
+// Port doluysa yığın izi yerine anlaşılır bir mesaj bas (genelde zaten açık demektir).
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error('');
+    console.error(`  ⛔  ${PORT} portu kullanımda — Mental0 muhtemelen zaten açık.`);
+    console.error(`      Panel: http://localhost:${PORT}/admin.html`);
+    console.error('      Başka bir kopya açmak istiyorsan önce eskisini kapat.');
+    console.error('');
+    process.exit(1);
+  }
+  throw err;
+});
+
 server.listen(PORT, () => {
   console.log('');
   console.log('  🧠  MENTAL0');
@@ -311,4 +324,12 @@ server.listen(PORT, () => {
   console.log(`  LLM     : ${configuredProviders().join(' → ') || 'YAPILANDIRILMADI (.env)'}`);
   console.log(`  Avatar  : ${avatarHazirMi() ? 'Kick API aktif' : 'kapalı (baş harf avatarı)'}`);
   console.log('');
+  console.log('  Kapatmak için bu pencerede Ctrl+C.');
+  console.log('');
+
+  // Kısayoldan açılınca paneli tarayıcıda aç. Sunucu dinlemeye başladıktan sonra
+  // yapıldığı için "bağlanılamadı" sayfası çıkmıyor.
+  if (process.env.OPEN_BROWSER === '1') {
+    require('child_process').exec(`start "" "http://localhost:${PORT}/admin.html"`);
+  }
 });
