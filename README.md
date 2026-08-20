@@ -76,6 +76,17 @@ başladığında panel bu dosyadan geri yüklenir, sohbet ve linkler kaybolmaz.
 Alttaki çubuktan kaydı indirebilir ya da **🧹 Kaydı temizle** ile sıfırlayabilirsin
 (dosya + sohbet listesi + linkler birlikte silinir, geri alınamaz).
 
+### Ses hangi overlay'den çıkar
+
+Overlay birden fazla yerde açıkken (OBS kaynağı + tarayıcıda önizleme) hepsi aynı
+mp3'ü çalıyor ve ses duble/yankılı duyuluyordu. Artık overlay'ler sunucuya kaydoluyor
+ve sesi **yalnızca biri** çalar; diğerleri raporu sessizce gösterir. Panelin sağ
+üstündeki listeden hangisi olduğunu seçersin.
+
+Overlay'i `overlay.html?ad=OBS` gibi açarsan panelde o adla görünür — hangisinin
+OBS olduğunu ayırt etmek kolaylaşır. Yayına başlamadan listeden OBS kaynağının
+seçili olduğunu doğrula.
+
 ### Overlay zemini
 
 "overlay zemini" işaretlenirse overlay'de yazının arkasına, aşağıda koyu olup yukarı
@@ -114,6 +125,10 @@ public/admin.html    Kontrol paneli
 - **Overlay'de `requestAnimationFrame` kullanma.** OBS kaynağı gizliyken tarayıcı kare
   üretmediği için geri çağrılar hiç çalışmıyor ve içerik görünmez kalıyor. Animasyon
   tetiklemek için senkron reflow (`void el.offsetWidth`) kullanılıyor.
+- **Skoru modelden sayı olarak isteme.** Model birkaç favori sayıya yığılıyor
+  (önce 23/27/42; klişeleri yasaklayınca hepsi 61 oldu) ve verdiği sayı içerikle
+  tutarsız kalıyor. Model artık sadece bir *bant* seçiyor (kaos/takinti/siradan/
+  sakin/supheli), kesin sayıyı `lib/prompts.js` bandın içinden üretiyor.
 - Rapor sesi sadece **60 saniyeden yeni** raporlarda çalınır; OBS kaynağı yenilenince
   eski bir rapor kendini tekrar seslendirmesin diye.
 

@@ -49,6 +49,12 @@ const ayarlar = {
 
 let pusherDurumu = { connected: false };
 
+// Bağlı overlay istemcileri. Aynı anda birden fazla overlay açıkken (OBS kaynağı +
+// tarayıcıda önizleme) hepsi aynı mp3'ü çalınca ses yankılı/duble duyuluyordu.
+// Bu yüzden sesi yalnızca "ses sahibi" overlay çalar; diğerleri sessiz gösterir.
+let overlaylar = [];      // { socketId, ad, bagliAt }
+let sesSahibi = null;     // socketId
+
 // ─── SUNUCU ───────────────────────────────────────────────────────────────────
 const app = express();
 const server = http.createServer(app);
@@ -63,6 +69,17 @@ function yayinla(event, payload) {
 
 function overlayGuncelle() {
   yayinla('overlay:state', overlayDurumu);
+}
+
+function overlaylariYayinla() {
+  yayinla('overlay:liste', { overlaylar, sesSahibi });
+}
+
+// Sahip yoksa ya da ayrıldıysa en eski overlay'e devret.
+function sesSahibiniDuzelt() {
+  if (!overlaylar.some((o) => o.socketId === sesSahibi)) {
+    sesSahibi = overlaylar.length ? overlaylar[0].socketId : null;
+  }
 }
 
 // ─── KICK CHAT (Pusher) ───────────────────────────────────────────────────────
@@ -202,6 +219,8 @@ app.get('/api/state', (req, res) => {
     linkler,
     log: chatKaydi.bilgi(),
     overlay: overlayDurumu,
+    overlaylar,
+    sesSahibi,
     pusher: pusherDurumu,
     ayarlar,
   });
@@ -221,6 +240,17 @@ app.post('/api/log/temizle', (req, res) => {
   yayinla('log:bilgi', chatKaydi.bilgi());
   console.log('🧹 Chat kaydı temizlendi');
   res.json({ ok: true, log: chatKaydi.bilgi() });
+});
+
+// Sesi hangi overlay'in çalacağını seç.
+app.post('/api/overlay/ses-sahibi', (req, res) => {
+  const { socketId } = req.body || {};
+  if (!overlaylar.some((o) => o.socketId === socketId)) {
+    return res.status(404).json({ error: 'Böyle bağlı bir overlay yok.' });
+  }
+  sesSahibi = socketId;
+  overlaylariYayinla();
+  res.json({ ok: true, sesSahibi });
 });
 
 // Ham kaydı indir (yedek almak ya da başka yerde incelemek için).
@@ -389,6 +419,30 @@ app.get('/', (req, res) => res.redirect('/admin.html'));
 
 // ─── SOCKET ───────────────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
+  // Overlay sayfası açılışta kendini tanıtır; panel bu listeyi gösterir.
+  socket.on('overlay:merhaba', ({ ad } = {}) => {
+    if (overlaylar.some((o) => o.socketId === socket.id)) return;
+    overlaylar.push({
+      socketId: socket.id,
+      ad: String(ad || '').slice(0, 40) || `overlay-${overlaylar.length + 1}`,
+      bagliAt: new Date().toISOString(),
+    });
+    sesSahibiniDuzelt();
+    overlaylariYayinla();
+    console.log(`🖥️  Overlay bağlandı (${overlaylar.length} açık) · ses sahibi: ${sesSahibi}`);
+  });
+
+  socket.on('disconnect', () => {
+    const oncekiSayi = overlaylar.length;
+    overlaylar = overlaylar.filter((o) => o.socketId !== socket.id);
+    if (overlaylar.length !== oncekiSayi) {
+      sesSahibiniDuzelt();
+      overlaylariYayinla();
+      console.log(`🖥️  Overlay ayrıldı (${overlaylar.length} açık) · ses sahibi: ${sesSahibi}`);
+    }
+  });
+
+  socket.emit('overlay:liste', { overlaylar, sesSahibi });
   socket.emit('chat:bulk', mesajlar.slice(-100));
   socket.emit('link:bulk', linkler);
   socket.emit('log:bilgi', chatKaydi.bilgi());

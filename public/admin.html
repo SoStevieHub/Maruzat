@@ -186,6 +186,19 @@
     border: 1px solid var(--riskli-cizgi); border-radius: 4px; padding: 1px 6px; margin-left: 6px;
   }
 
+  /* ─── Bağlı overlay'ler ─── */
+  .overlay-kutu {
+    border: 1px solid var(--cizgi); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 14px; font-size: 13px;
+  }
+  .overlay-kutu .baslik {
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--soluk); margin-bottom: 8px;
+  }
+  .overlay-satir { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .overlay-satir label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+  .overlay-uyari { color: var(--uyari); font-size: 12px; margin-top: 8px; }
+
   /* ─── Rapor editörü ─── */
   .alan { margin-bottom: 12px; }
   .alan label { display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--soluk); margin-bottom: 5px; }
@@ -267,6 +280,12 @@
   <section class="panel">
     <h2>Yayın Kontrolü <span class="sag" id="yayinDurum"></span></h2>
     <div class="icerik">
+
+      <div class="overlay-kutu" id="overlayKutu" style="display:none">
+        <div class="baslik">Bağlı overlay'ler · sesi hangisi çalsın?</div>
+        <div id="overlayListe"></div>
+        <div class="overlay-uyari" id="overlayUyari" style="display:none"></div>
+      </div>
 
       <div id="secilenKutu"><div class="bos">Henüz bir mesaj seçilmedi. Soldan “Öne Çıkar” veya “AI Analiz” ile başla.</div></div>
 
@@ -636,6 +655,45 @@
     $('testMesaj').value = '';
   };
   $('testMesaj').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('testGonder').click(); });
+
+  // ─── Bağlı overlay'ler ─────────────────────────────────────────────────────
+  let overlaylar = [];
+  let sesSahibi = null;
+
+  function overlaylariCiz() {
+    const kutu = $('overlayKutu');
+    if (!overlaylar.length) { kutu.style.display = 'none'; return; }
+    kutu.style.display = '';
+
+    $('overlayListe').innerHTML = overlaylar.map((o, i) => `
+      <div class="overlay-satir">
+        <label>
+          <input type="radio" name="sesSahibi" value="${kacir(o.socketId)}" ${o.socketId === sesSahibi ? 'checked' : ''}>
+          <span>${kacir(o.ad)}</span>
+          <span style="color:var(--soluk)"> · ${saat(o.bagliAt)}${o.socketId === sesSahibi ? ' · 🔊 ses burada' : ''}</span>
+        </label>
+      </div>`).join('');
+
+    const uyari = $('overlayUyari');
+    if (overlaylar.length > 1) {
+      uyari.style.display = '';
+      uyari.textContent = `${overlaylar.length} overlay açık. Sesi yalnızca seçili olan çalar; ` +
+        'yayında OBS kaynağının seçili olduğundan emin ol.';
+    } else {
+      uyari.style.display = 'none';
+    }
+  }
+
+  $('overlayListe').addEventListener('change', (e) => {
+    if (e.target.name !== 'sesSahibi') return;
+    api('/api/overlay/ses-sahibi', { socketId: e.target.value }).catch(hataGoster);
+  });
+
+  socket.on('overlay:liste', (d) => {
+    overlaylar = d.overlaylar || [];
+    sesSahibi = d.sesSahibi || null;
+    overlaylariCiz();
+  });
 
   // ─── Tema ──────────────────────────────────────────────────────────────────
   function temaUygula(tema) {

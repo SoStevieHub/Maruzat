@@ -281,6 +281,24 @@
   let sonNonce = 0;
   let yazmaTimer = null;
 
+  // Aynı anda birden fazla overlay açıkken (OBS kaynağı + tarayıcı önizlemesi)
+  // hepsi çalınca ses duble duyuluyor. Sesi yalnızca sunucunun seçtiği overlay çalar.
+  // ?ad=... ile panelde ayırt edici bir isim verilebilir.
+  const overlayAdi = new URLSearchParams(location.search).get('ad') || '';
+  let sesBendeMi = false;
+
+  let listeGeldi = false;
+
+  socket.on('connect', () => socket.emit('overlay:merhaba', { ad: overlayAdi }));
+  socket.on('overlay:liste', ({ sesSahibi }) => {
+    listeGeldi = true;
+    sesBendeMi = sesSahibi === socket.id;
+  });
+
+  // Emniyet: liste hiç gelmezse (eski sunucu, kopuk bağlantı) overlay kalıcı sessiz
+  // kalmasın — sessiz bir yayın, çift sesten daha kötü.
+  setTimeout(() => { if (!listeGeldi) sesBendeMi = true; }, 3000);
+
   // Uzun metinlerde punto küçülsün ki sol yarıya sığsın.
   // basla = küçültmenin devreye girdiği karakter sayısı, bit = en küçük puntoya inilen uzunluk.
   function puntoAyarla(el, uzunluk, buyuk, kucuk, basla, bit) {
@@ -391,7 +409,7 @@
     // sadece yeni üretilmiş raporların sesi çalınır.
     const taze = Date.now() - new Date(r.at).getTime() < 60000;
 
-    if (r.audioUrl && taze) {
+    if (r.audioUrl && taze && sesBendeMi) {
       ses.src = r.audioUrl;
       ses.currentTime = 0;
       // Sesli modda yazı, ses başlayınca konuşma süresine yayılarak yazılır.
