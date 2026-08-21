@@ -9,7 +9,10 @@ const { Server } = require('socket.io');
 const Pusher = require('pusher-js/node');
 
 const { chat, configuredProviders } = require('./lib/llm');
-const { USLUPLAR, uslupListesi, kullaniciMesaji, raporAyristir, seslendirmeMetni } = require('./lib/prompts');
+const {
+  USLUPLAR, uslupListesi, kullaniciMesaji,
+  raporAyristir, raporSorunu, seslendirmeMetni,
+} = require('./lib/prompts');
 const { seslendir, getir: sesGetir, SESLER, VARSAYILAN_SES } = require('./lib/tts');
 const { profilFotosu, yapilandirildiMi: avatarHazirMi } = require('./lib/avatar');
 const { riskliMi } = require('./lib/safety');
@@ -309,21 +312,37 @@ app.post('/api/analiz', async (req, res) => {
 
   const uslupId = USLUPLAR[req.body?.uslup] ? req.body.uslup : ayarlar.uslup;
 
+  // Model ara sıra talimatı ya da düşünme zincirini rapora sızdırıyor. Böyle bir
+  // çıktıyı panele hiç göstermeyip yeniden istiyoruz.
+  const elemeler = [];
   try {
-    const sonuc = await chat(
-      USLUPLAR[uslupId].system,
-      kullaniciMesaji({ username: mesaj.user, message: mesaj.message }),
-      { temperature: 1.0, maxTokens: 800 },
-    );
-    const rapor = raporAyristir(sonuc.text);
-    res.json({
-      ok: true,
-      messageId: mesaj.id,
-      uslup: uslupId,
-      ...rapor,
-      seslendirme: seslendirmeMetni(rapor),
-      saglayici: `${sonuc.provider} / ${sonuc.model}`,
-      denemeler: sonuc.attempts,
+    for (let deneme = 1; deneme <= 3; deneme++) {
+      const sonuc = await chat(
+        USLUPLAR[uslupId].system,
+        kullaniciMesaji({ username: mesaj.user, message: mesaj.message }),
+        { temperature: 1.0, maxTokens: 1400 },
+      );
+      const rapor = raporAyristir(sonuc.text);
+      const sorun = raporSorunu(rapor);
+
+      if (sorun) {
+        elemeler.push(`${sonuc.provider}: ${sorun}`);
+        console.warn(`[analiz] ${sonuc.provider} çıktısı elendi (${sorun}), yeniden deneniyor`);
+        continue;
+      }
+
+      return res.json({
+        ok: true,
+        messageId: mesaj.id,
+        uslup: uslupId,
+        ...rapor,
+        seslendirme: seslendirmeMetni(rapor),
+        saglayici: `${sonuc.provider} / ${sonuc.model}`,
+        denemeler: [...sonuc.attempts, ...elemeler],
+      });
+    }
+    res.status(502).json({
+      error: 'AI kullanılabilir bir rapor üretemedi:\n' + elemeler.join('\n'),
     });
   } catch (err) {
     console.error('[analiz] hata:', err.message || err);

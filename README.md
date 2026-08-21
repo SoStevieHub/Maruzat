@@ -56,7 +56,8 @@ Browser Source ekle:
 2. **Öne Çıkar** → mesaj + avatar overlay'e düşer.
 3. **AI Analiz** → mesajı overlay'e basar ve raporu panelde taslak olarak üretir.
 4. Taslağı oku, istersen teşhisi/skoru/metni elle düzelt, **Yeniden üret** ile başka bir
-   varyant al veya **🎧 Sesi dinle** ile önce kendin duy.
+   varyant al veya **🎧 Sesi dinle** ile önce kendin duy. Raporlar 250-460 karakter
+   civarında; sesli okunduğunda 25-35 saniye tutuyor, kısa istiyorsan panelde kırp.
 5. **Yayına ver (yazılı)** ya da **Yayına ver (sesli)**.
 6. **Raporu kaldır** raporu indirir, **Overlay'i tamamen temizle** her şeyi siler.
 
@@ -125,6 +126,14 @@ public/admin.html    Kontrol paneli
 - **Overlay'de `requestAnimationFrame` kullanma.** OBS kaynağı gizliyken tarayıcı kare
   üretmediği için geri çağrılar hiç çalışmıyor ve içerik görünmez kalıyor. Animasyon
   tetiklemek için senkron reflow (`void el.offsetWidth`) kullanılıyor.
+- **Rapor uzunluğu ve `reasoning_effort` birbirine bağlı.** gpt-oss'ta `low` ile
+  model mesajı gerçekten okumadan genel geçer cümleler kuruyor; `medium` gözlemi
+  somutlaştırıyor. Ama qwen3'te `default` denemesi felaket: düşünme zincirinin
+  tamamını `content`e sızdırıyor (3000+ karakterlik İngilizce muhakeme). qwen3
+  **`none` kalmalı**.
+- **Modelin çıktısı doğrulanmadan yayına verilmemeli.** `raporSorunu()` talimat
+  yankısını, yer tutucuları, İngilizce muhakeme sızıntısını ve absürt uzunlukları
+  yakalıyor; `/api/analiz` böyle bir çıktıyı atıp 3 kez yeniden deniyor.
 - **Skoru modelden sayı olarak isteme.** Model birkaç favori sayıya yığılıyor
   (önce 23/27/42; klişeleri yasaklayınca hepsi 61 oldu) ve verdiği sayı içerikle
   tutarsız kalıyor. Model artık sadece bir *bant* seçiyor (kaos/takinti/siradan/
